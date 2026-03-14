@@ -391,6 +391,12 @@ html, body {
 .pm-abs.vis{display:block;}
 .pm-must{display:inline-flex;align-items:center;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;background:var(--red);color:#fff;margin-left:6px;}
 
+/* ── MOBILE NAV MORE PANEL ── */
+.mni-more-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:9px;font-weight:500;background:var(--surface2);border:1px solid var(--border);transition:all .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.mni-more-item:active{background:var(--glow);color:var(--blue);}
+.mni-more-item span{font-size:18px;line-height:1;}
+.mni-more-item.active-more{color:var(--blue);border-color:var(--blue);background:var(--glow);}
+
 /* ── MODEL SELECTOR ── */
 .model-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);transition:border-color .15s;}
 .model-opt:has(input:checked){border-color:var(--blue);background:rgba(88,166,255,.06);}
@@ -1154,6 +1160,20 @@ html, body {
     <div class="mni" id="mni-papers" onclick="showPage('papers')"><span class="mic">🔬</span>논문</div>
     <div class="mni" id="mni-weekly" onclick="showPage('weekly')"><span class="mic">📊</span>주간</div>
     <div class="mni" id="mni-all" onclick="showPage('all')"><span class="mic">📚</span>전체</div>
+    <div class="mni" id="mni-more" onclick="toggleMobileMore()"><span class="mic">☰</span>더보기</div>
+  </div>
+  <!-- 더보기 패널 -->
+  <div id="mnav-more-panel" style="display:none;padding:8px 6px;border-top:1px solid var(--border);background:var(--surface)">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px">
+      <div class="mni-more-item" onclick="showPageFromMore('review')"><span>🔁</span>복습</div>
+      <div class="mni-more-item" onclick="showPageFromMore('quiz')"><span>🧩</span>퀴즈</div>
+      <div class="mni-more-item" onclick="showPageFromMore('case')"><span>🏥</span>증례</div>
+      <div class="mni-more-item" onclick="showPageFromMore('strategy')"><span>🧭</span>전략</div>
+      <div class="mni-more-item" onclick="showPageFromMore('map')"><span>🗺️</span>주제지도</div>
+      <div class="mni-more-item" onclick="showPageFromMore('import')"><span>📥</span>가져오기</div>
+      <div class="mni-more-item" onclick="showPageFromMore('sync')"><span>☁️</span>동기화</div>
+      <div class="mni-more-item" onclick="showPageFromMore('settings')"><span>⚙️</span>설정</div>
+    </div>
   </div>
 </nav>
 
@@ -1177,6 +1197,7 @@ function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.mni').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.mni-more-item').forEach(n=>n.classList.remove('active-more'));
   document.getElementById('page-'+name).classList.add('active');
   const sni=document.getElementById('sni-'+name); if(sni) sni.classList.add('active');
   const mni=document.getElementById('mni-'+name); if(mni) mni.classList.add('active');
@@ -2640,10 +2661,21 @@ function initTheme(){
 // ════════ FULLSCREEN ════════
 function toggleFullscreen(){
   if(!document.fullscreenElement){
-    document.documentElement.requestFullscreen().catch(()=>{});
+    // 세로모드 유지하며 전체화면
+    document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{
+      // screen.orientation API로 현재 방향 잠금 (세로 유지)
+      if(screen.orientation && screen.orientation.lock){
+        screen.orientation.lock('portrait').catch(()=>{
+          // 일부 기기에서 지원 안 할 수 있음 — 무시
+        });
+      }
+    }).catch(()=>{});
     document.getElementById('fs-btn').textContent='✕';
     document.getElementById('fs-btn').title='전체화면 종료';
   }else{
+    if(screen.orientation && screen.orientation.unlock){
+      screen.orientation.unlock();
+    }
     document.exitFullscreen();
     document.getElementById('fs-btn').textContent='⛶';
     document.getElementById('fs-btn').title='전체화면';
@@ -2652,7 +2684,46 @@ function toggleFullscreen(){
 document.addEventListener('fullscreenchange',()=>{
   const btn=document.getElementById('fs-btn');
   if(btn) btn.textContent=document.fullscreenElement?'✕':'⛶';
+  if(!document.fullscreenElement && screen.orientation && screen.orientation.unlock){
+    screen.orientation.unlock();
+  }
 });
+
+// ════════ MOBILE MORE MENU ════════
+let moreMenuOpen = false;
+function toggleMobileMore(){
+  moreMenuOpen = !moreMenuOpen;
+  const panel = document.getElementById('mnav-more-panel');
+  const btn = document.getElementById('mni-more');
+  if(moreMenuOpen){
+    panel.style.display = 'block';
+    btn.style.color = 'var(--blue)';
+    // content 패딩 늘리기
+    document.querySelector('.content').style.paddingBottom = '160px';
+  } else {
+    panel.style.display = 'none';
+    btn.style.color = '';
+    document.querySelector('.content').style.paddingBottom = '';
+  }
+}
+
+function showPageFromMore(name){
+  // 더보기 패널 닫기
+  moreMenuOpen = false;
+  document.getElementById('mnav-more-panel').style.display = 'none';
+  document.getElementById('mni-more').style.color = '';
+  document.querySelector('.content').style.paddingBottom = '';
+  // 더보기 항목 active 표시
+  document.querySelectorAll('.mni-more-item').forEach(el=>el.classList.remove('active-more'));
+  showPage(name);
+  // 해당 항목 하이라이트
+  const items = document.querySelectorAll('.mni-more-item');
+  const pages = ['review','quiz','case','strategy','map','import','sync','settings'];
+  const idx = pages.indexOf(name);
+  if(idx >= 0 && items[idx]) items[idx].classList.add('active-more');
+  // 더보기 버튼 active
+  document.getElementById('mni-more').style.color = 'var(--blue)';
+}
 
 // ════════ GOOGLE APPS SCRIPT SYNC ════════
 // 완전 무료, OAuth 없음, URL이 비밀키 역할
