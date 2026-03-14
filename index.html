@@ -916,6 +916,7 @@ html, body {
         </div>
 
         <!-- Status -->
+        <div id="gas-env-banner" style="margin-bottom:10px;padding:9px 12px;border-radius:7px;font-size:11px;line-height:1.7"></div>
         <div id="gas-status-row" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <div class="gdrive-dot" id="gas-dot"></div>
           <span id="gas-status-text" style="font-size:12px;color:var(--muted)">미설정</span>
@@ -1905,6 +1906,33 @@ function initSettingsPage(){
     ? '<span style="color:var(--green)">✅ Gemini API 키 저장됨 — 무료 사용 중</span>'
     : '<span style="color:var(--muted)">Gemini API 키 없음</span>';
 
+  // 환경 배너
+  const banner = document.getElementById('gas-env-banner');
+  if(banner){
+    const origin = location.origin || '';
+    const href = location.href || '';
+    const isClaude = href.includes('claude.ai') || origin.includes('claude.ai');
+    const isGitHub = origin.includes('github.io');
+    const isLocal = location.protocol === 'file:' || origin === 'null' || origin === '';
+    if(isGitHub){
+      banner.style.background = 'rgba(63,185,80,.1)';
+      banner.style.border = '1px solid rgba(63,185,80,.3)';
+      banner.innerHTML = '✅ <strong>GitHub Pages 환경</strong> — 동기화가 정상 작동해요!';
+    } else if(isClaude){
+      banner.style.background = 'rgba(255,166,87,.1)';
+      banner.style.border = '1px solid rgba(255,166,87,.3)';
+      banner.innerHTML = '⚠️ <strong>Claude.ai 환경</strong> — 동기화 불가. <strong>GitHub Pages URL</strong>로 앱을 열어야 동기화돼요.<br><span style="color:var(--muted)">GitHub URL: 동기화 탭에서 확인</span>';
+    } else if(isLocal){
+      banner.style.background = 'rgba(247,129,102,.1)';
+      banner.style.border = '1px solid rgba(247,129,102,.3)';
+      banner.innerHTML = '⚠️ <strong>로컬 파일 환경</strong> — 동기화 불가. GitHub Pages로 배포 후 사용해주세요.';
+    } else {
+      banner.style.background = 'rgba(88,166,255,.1)';
+      banner.style.border = '1px solid rgba(88,166,255,.2)';
+      banner.innerHTML = `현재 환경: <strong>${origin}</strong>`;
+    }
+  }
+
   if(gasUrl){
     const st = document.getElementById('gas-url-status');
     if(st) st.innerHTML = '<span style="color:var(--green)">✅ Apps Script URL 저장됨</span>';
@@ -2738,10 +2766,26 @@ function saveGasUrl() {
 
 function initAppsScript() {
   const url = localStorage.getItem('gasUrl');
-  if (url) {
-    document.getElementById('gas-sync-btn').style.display = '';
-    updateGasStatus('conn', '설정됨');
+  const origin = location.origin || '';
+  const href = location.href || '';
+  const isClaude = href.includes('claude.ai') || origin.includes('claude.ai');
+  const isLocal = location.protocol === 'file:' || origin === 'null' || origin === '';
+  const isGitHub = origin.includes('github.io');
+
+  const syncBtn = document.getElementById('gas-sync-btn');
+  if (syncBtn) {
+    if (isClaude) {
+      // Claude.ai에서는 버튼 표시하되 클릭 시 안내
+      syncBtn.style.display = '';
+      syncBtn.textContent = '☁️ 동기화 (GitHub에서만)';
+      syncBtn.style.borderColor = 'var(--muted)';
+      syncBtn.style.color = 'var(--muted)';
+    } else if (url) {
+      syncBtn.style.display = '';
+    }
   }
+
+  if (url) updateGasStatus('conn', isGitHub ? '설정됨 — 동기화 가능' : isClaude ? '⚠️ GitHub에서만 동기화 가능' : '설정됨');
 }
 
 function updateGasStatus(state, msg) {
@@ -2757,6 +2801,22 @@ async function gasSync() {
   if (!url) {
     toast('⚠️ 설정 탭에서 Apps Script URL을 먼저 입력해주세요', false);
     showPage('settings');
+    return;
+  }
+
+  // 환경 감지
+  const origin = location.origin || '';
+  const href = location.href || '';
+  const isClaude = href.includes('claude.ai') || origin.includes('claude.ai');
+  const isLocal = location.protocol === 'file:' || origin === 'null' || origin === '';
+  const isGitHub = origin.includes('github.io');
+
+  if (isClaude || isLocal) {
+    // Claude.ai 또는 로컬에서는 동기화 불가 안내
+    const msg = isClaude
+      ? '⚠️ Claude.ai 대화창에서는 동기화가 불가능해요.\n\nGitHub Pages URL로 앱을 열어서 동기화해주세요!\n(동기화 탭에서 설정 방법 확인)'
+      : '⚠️ 로컬 파일에서는 동기화가 불가능해요.\n\nGitHub Pages URL로 앱을 열어서 사용해주세요.';
+    alert(msg);
     return;
   }
 
