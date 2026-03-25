@@ -391,6 +391,12 @@ html, body {
 .pm-abs.vis{display:block;}
 .pm-must{display:inline-flex;align-items:center;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;background:var(--red);color:#fff;margin-left:6px;}
 
+/* ── MOBILE NAV MORE PANEL ── */
+.mni-more-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:9px;font-weight:500;background:var(--surface2);border:1px solid var(--border);transition:all .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.mni-more-item:active{background:var(--glow);color:var(--blue);}
+.mni-more-item span{font-size:18px;line-height:1;}
+.mni-more-item.active-more{color:var(--blue);border-color:var(--blue);background:var(--glow);}
+
 /* ── MODEL SELECTOR ── */
 .model-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);transition:border-color .15s;}
 .model-opt:has(input:checked){border-color:var(--blue);background:rgba(88,166,255,.06);}
@@ -916,6 +922,7 @@ html, body {
         </div>
 
         <!-- Status -->
+        <div id="gas-env-banner" style="margin-bottom:10px;padding:9px 12px;border-radius:7px;font-size:11px;line-height:1.7"></div>
         <div id="gas-status-row" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <div class="gdrive-dot" id="gas-dot"></div>
           <span id="gas-status-text" style="font-size:12px;color:var(--muted)">미설정</span>
@@ -1153,6 +1160,20 @@ html, body {
     <div class="mni" id="mni-papers" onclick="showPage('papers')"><span class="mic">🔬</span>논문</div>
     <div class="mni" id="mni-weekly" onclick="showPage('weekly')"><span class="mic">📊</span>주간</div>
     <div class="mni" id="mni-all" onclick="showPage('all')"><span class="mic">📚</span>전체</div>
+    <div class="mni" id="mni-more" onclick="toggleMobileMore()"><span class="mic">☰</span>더보기</div>
+  </div>
+  <!-- 더보기 패널 -->
+  <div id="mnav-more-panel" style="display:none;padding:8px 6px;border-top:1px solid var(--border);background:var(--surface)">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px">
+      <div class="mni-more-item" onclick="showPageFromMore('review')"><span>🔁</span>복습</div>
+      <div class="mni-more-item" onclick="showPageFromMore('quiz')"><span>🧩</span>퀴즈</div>
+      <div class="mni-more-item" onclick="showPageFromMore('case')"><span>🏥</span>증례</div>
+      <div class="mni-more-item" onclick="showPageFromMore('strategy')"><span>🧭</span>전략</div>
+      <div class="mni-more-item" onclick="showPageFromMore('map')"><span>🗺️</span>주제지도</div>
+      <div class="mni-more-item" onclick="showPageFromMore('import')"><span>📥</span>가져오기</div>
+      <div class="mni-more-item" onclick="showPageFromMore('sync')"><span>☁️</span>동기화</div>
+      <div class="mni-more-item" onclick="showPageFromMore('settings')"><span>⚙️</span>설정</div>
+    </div>
   </div>
 </nav>
 
@@ -1176,6 +1197,7 @@ function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   document.querySelectorAll('.mni').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.mni-more-item').forEach(n=>n.classList.remove('active-more'));
   document.getElementById('page-'+name).classList.add('active');
   const sni=document.getElementById('sni-'+name); if(sni) sni.classList.add('active');
   const mni=document.getElementById('mni-'+name); if(mni) mni.classList.add('active');
@@ -1799,7 +1821,7 @@ async function callClaude(sys, usr, maxT=1500){
 async function callClaudeAPI(sys, usr, maxT, model){
   const key = localStorage.getItem('anthropicApiKey');
   if(!key) throw new Error('Claude API 키가 없습니다. ⚙️ 설정에서 API 키를 입력해주세요.');
-  const headers = {'Content-Type':'application/json','x-api-key':key};
+  const headers = {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'};
   const r = await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST', headers,
     body: JSON.stringify({model, max_tokens:maxT, system:sys, messages:[{role:'user',content:usr}]})
@@ -1904,6 +1926,33 @@ function initSettingsPage(){
   document.getElementById('gemini-key-status').innerHTML = geminiKey
     ? '<span style="color:var(--green)">✅ Gemini API 키 저장됨 — 무료 사용 중</span>'
     : '<span style="color:var(--muted)">Gemini API 키 없음</span>';
+
+  // 환경 배너
+  const banner = document.getElementById('gas-env-banner');
+  if(banner){
+    const origin = location.origin || '';
+    const href = location.href || '';
+    const isClaude = href.includes('claude.ai') || origin.includes('claude.ai');
+    const isGitHub = origin.includes('github.io');
+    const isLocal = location.protocol === 'file:' || origin === 'null' || origin === '';
+    if(isGitHub){
+      banner.style.background = 'rgba(63,185,80,.1)';
+      banner.style.border = '1px solid rgba(63,185,80,.3)';
+      banner.innerHTML = '✅ <strong>GitHub Pages 환경</strong> — 동기화가 정상 작동해요!';
+    } else if(isClaude){
+      banner.style.background = 'rgba(255,166,87,.1)';
+      banner.style.border = '1px solid rgba(255,166,87,.3)';
+      banner.innerHTML = '⚠️ <strong>Claude.ai 환경</strong> — 동기화 불가. <strong>GitHub Pages URL</strong>로 앱을 열어야 동기화돼요.<br><span style="color:var(--muted)">GitHub URL: 동기화 탭에서 확인</span>';
+    } else if(isLocal){
+      banner.style.background = 'rgba(247,129,102,.1)';
+      banner.style.border = '1px solid rgba(247,129,102,.3)';
+      banner.innerHTML = '⚠️ <strong>로컬 파일 환경</strong> — 동기화 불가. GitHub Pages로 배포 후 사용해주세요.';
+    } else {
+      banner.style.background = 'rgba(88,166,255,.1)';
+      banner.style.border = '1px solid rgba(88,166,255,.2)';
+      banner.innerHTML = `현재 환경: <strong>${origin}</strong>`;
+    }
+  }
 
   if(gasUrl){
     const st = document.getElementById('gas-url-status');
@@ -2361,12 +2410,13 @@ const REVIEW_INTERVALS=[1,3,7,21]; // days
 
 function getReviewStatus(e){
   const reviews=e.reviews||[];
-  const created=new Date(e.date);
   const now=new Date();
   const stage=reviews.length;
   if(stage>=REVIEW_INTERVALS.length) return 'done';
-  const nextReview=new Date(created);
-  nextReview.setDate(created.getDate()+REVIEW_INTERVALS[stage]);
+  // 마지막 복습일 기준으로 다음 복습 계산 (없으면 생성일 기준)
+  const baseDate=reviews.length>0 ? new Date(reviews[reviews.length-1]) : new Date(e.date);
+  const nextReview=new Date(baseDate);
+  nextReview.setDate(baseDate.getDate()+REVIEW_INTERVALS[stage]);
   const diffDays=(now-nextReview)/(1000*60*60*24);
   if(diffDays>=0) return 'overdue';
   return 'ok';
@@ -2469,7 +2519,7 @@ function exportJSON(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   const d=new Date();
-  a.href=url;a.download=`vetmed-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  a.href=url;a.download=`vetmed-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.json`;
   a.click();URL.revokeObjectURL(url);
   toast('✅ JSON 백업 완료!',true);
 }
@@ -2582,9 +2632,10 @@ async function callAI(thinkId, resId, sys, usr, maxT=1500){
     document.getElementById(thinkId).classList.remove('vis');
     if(resId){
       const el=document.getElementById(resId);
-      el.textContent='오류가 발생했습니다. 다시 시도해주세요.';
+      el.textContent='오류: ' + e.message;
       el.classList.add('vis');
     }
+    toast('❌ AI 오류: ' + e.message, false);
   }
 }
 
@@ -2611,10 +2662,21 @@ function initTheme(){
 // ════════ FULLSCREEN ════════
 function toggleFullscreen(){
   if(!document.fullscreenElement){
-    document.documentElement.requestFullscreen().catch(()=>{});
+    // 세로모드 유지하며 전체화면
+    document.documentElement.requestFullscreen({navigationUI:'hide'}).then(()=>{
+      // screen.orientation API로 현재 방향 잠금 (세로 유지)
+      if(screen.orientation && screen.orientation.lock){
+        screen.orientation.lock('portrait').catch(()=>{
+          // 일부 기기에서 지원 안 할 수 있음 — 무시
+        });
+      }
+    }).catch(()=>{});
     document.getElementById('fs-btn').textContent='✕';
     document.getElementById('fs-btn').title='전체화면 종료';
   }else{
+    if(screen.orientation && screen.orientation.unlock){
+      screen.orientation.unlock();
+    }
     document.exitFullscreen();
     document.getElementById('fs-btn').textContent='⛶';
     document.getElementById('fs-btn').title='전체화면';
@@ -2623,7 +2685,46 @@ function toggleFullscreen(){
 document.addEventListener('fullscreenchange',()=>{
   const btn=document.getElementById('fs-btn');
   if(btn) btn.textContent=document.fullscreenElement?'✕':'⛶';
+  if(!document.fullscreenElement && screen.orientation && screen.orientation.unlock){
+    screen.orientation.unlock();
+  }
 });
+
+// ════════ MOBILE MORE MENU ════════
+let moreMenuOpen = false;
+function toggleMobileMore(){
+  moreMenuOpen = !moreMenuOpen;
+  const panel = document.getElementById('mnav-more-panel');
+  const btn = document.getElementById('mni-more');
+  if(moreMenuOpen){
+    panel.style.display = 'block';
+    btn.style.color = 'var(--blue)';
+    // content 패딩 늘리기
+    document.querySelector('.content').style.paddingBottom = '160px';
+  } else {
+    panel.style.display = 'none';
+    btn.style.color = '';
+    document.querySelector('.content').style.paddingBottom = '';
+  }
+}
+
+function showPageFromMore(name){
+  // 더보기 패널 닫기
+  moreMenuOpen = false;
+  document.getElementById('mnav-more-panel').style.display = 'none';
+  document.getElementById('mni-more').style.color = '';
+  document.querySelector('.content').style.paddingBottom = '';
+  // 더보기 항목 active 표시
+  document.querySelectorAll('.mni-more-item').forEach(el=>el.classList.remove('active-more'));
+  showPage(name);
+  // 해당 항목 하이라이트
+  const items = document.querySelectorAll('.mni-more-item');
+  const pages = ['review','quiz','case','strategy','map','import','sync','settings'];
+  const idx = pages.indexOf(name);
+  if(idx >= 0 && items[idx]) items[idx].classList.add('active-more');
+  // 더보기 버튼 active
+  document.getElementById('mni-more').style.color = 'var(--blue)';
+}
 
 // ════════ GOOGLE APPS SCRIPT SYNC ════════
 // 완전 무료, OAuth 없음, URL이 비밀키 역할
@@ -2729,18 +2830,57 @@ function saveGasUrl() {
   if (!url) { toast('⚠️ URL을 입력해주세요', false); return; }
   if (!url.includes('script.google.com')) { toast('⚠️ Apps Script URL 형식이 아닌 것 같아요', false); }
   localStorage.setItem('gasUrl', url);
-  document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--green)">✅ URL 저장됨. 동기화 버튼을 눌러 테스트해보세요.</span>';
+  document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--orange)">⏳ 연결 테스트 중...</span>';
   document.getElementById('gas-sync-btn').style.display = '';
-  updateGasStatus('ok', '설정됨 — 동기화 준비 완료');
-  toast('✅ Apps Script URL 저장!', true);
+  updateGasStatus('', '연결 테스트 중...');
+  toast('✅ URL 저장! 연결 테스트 중...', true);
+  fetch(url, { method: 'GET', redirect: 'follow' })
+    .then(r => r.text())
+    .then(text => {
+      try {
+        const d = JSON.parse(text);
+        if (d.ok !== undefined) {
+          document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--green)">✅ 연결 성공! 동기화 버튼을 눌러보세요.</span>';
+          updateGasStatus('conn', '연결 확인됨 — 동기화 가능');
+          toast('✅ Apps Script 연결 성공!', true);
+        } else {
+          throw new Error('응답 형식 오류: ' + text.slice(0,120));
+        }
+      } catch(e) {
+        document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--red)">❌ 응답 파싱 실패: ' + e.message + '</span>';
+        updateGasStatus('err', '연결 실패 — Apps Script 재배포 필요');
+        toast('❌ GAS 응답 오류: ' + e.message, false);
+      }
+    })
+    .catch(err => {
+      document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--red)">❌ 네트워크 오류: ' + err.message + '</span>';
+      updateGasStatus('err', '네트워크 오류');
+      toast('❌ 연결 오류: ' + err.message, false);
+    });
 }
 
 function initAppsScript() {
   const url = localStorage.getItem('gasUrl');
-  if (url) {
-    document.getElementById('gas-sync-btn').style.display = '';
-    updateGasStatus('conn', '설정됨');
+  const origin = location.origin || '';
+  const href = location.href || '';
+  const isClaude = href.includes('claude.ai') || origin.includes('claude.ai');
+  const isLocal = location.protocol === 'file:' || origin === 'null' || origin === '';
+  const isGitHub = origin.includes('github.io');
+
+  const syncBtn = document.getElementById('gas-sync-btn');
+  if (syncBtn) {
+    if (isClaude) {
+      // Claude.ai에서는 버튼 표시하되 클릭 시 안내
+      syncBtn.style.display = '';
+      syncBtn.textContent = '☁️ 동기화 (GitHub에서만)';
+      syncBtn.style.borderColor = 'var(--muted)';
+      syncBtn.style.color = 'var(--muted)';
+    } else if (url) {
+      syncBtn.style.display = '';
+    }
   }
+
+  if (url) updateGasStatus('conn', isGitHub ? '설정됨 — 동기화 가능' : isClaude ? '⚠️ GitHub에서만 동기화 가능' : '설정됨');
 }
 
 function updateGasStatus(state, msg) {
@@ -2759,9 +2899,19 @@ async function gasSync() {
     return;
   }
 
-  // file:// origin에서는 CORS로 인해 동기화 불가
-  if (location.protocol === 'file:' || location.origin === 'null') {
-    toast('⚠️ 로컬 파일에서는 동기화 불가. Claude.ai에서 사용하거나 JSON 백업을 이용해주세요.', false);
+  // 환경 감지
+  const origin = location.origin || '';
+  const href = location.href || '';
+  const isClaude = href.includes('claude.ai') || origin.includes('claude.ai');
+  const isLocal = location.protocol === 'file:' || origin === 'null' || origin === '';
+  const isGitHub = origin.includes('github.io');
+
+  if (isClaude || isLocal) {
+    // Claude.ai 또는 로컬에서는 동기화 불가 안내
+    const msg = isClaude
+      ? '⚠️ Claude.ai 대화창에서는 동기화가 불가능해요.\n\nGitHub Pages URL로 앱을 열어서 동기화해주세요!\n(동기화 탭에서 설정 방법 확인)'
+      : '⚠️ 로컬 파일에서는 동기화가 불가능해요.\n\nGitHub Pages URL로 앱을 열어서 사용해주세요.';
+    alert(msg);
     return;
   }
 
