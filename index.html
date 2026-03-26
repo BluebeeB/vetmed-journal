@@ -1821,7 +1821,7 @@ async function callClaude(sys, usr, maxT=1500){
 async function callClaudeAPI(sys, usr, maxT, model){
   const key = localStorage.getItem('anthropicApiKey');
   if(!key) throw new Error('Claude API 키가 없습니다. ⚙️ 설정에서 API 키를 입력해주세요.');
-  const headers = {'Content-Type':'application/json','x-api-key':key};
+  const headers = {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'};
   const r = await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST', headers,
     body: JSON.stringify({model, max_tokens:maxT, system:sys, messages:[{role:'user',content:usr}]})
@@ -2632,9 +2632,10 @@ async function callAI(thinkId, resId, sys, usr, maxT=1500){
     document.getElementById(thinkId).classList.remove('vis');
     if(resId){
       const el=document.getElementById(resId);
-      el.textContent='오류가 발생했습니다. 다시 시도해주세요.';
+      el.textContent='오류: ' + e.message;
       el.classList.add('vis');
     }
+    toast('❌ AI 오류: ' + e.message, false);
   }
 }
 
@@ -2829,10 +2830,33 @@ function saveGasUrl() {
   if (!url) { toast('⚠️ URL을 입력해주세요', false); return; }
   if (!url.includes('script.google.com')) { toast('⚠️ Apps Script URL 형식이 아닌 것 같아요', false); }
   localStorage.setItem('gasUrl', url);
-  document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--green)">✅ URL 저장됨. 동기화 버튼을 눌러 테스트해보세요.</span>';
+  document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--orange)">⏳ 연결 테스트 중...</span>';
   document.getElementById('gas-sync-btn').style.display = '';
-  updateGasStatus('ok', '설정됨 — 동기화 준비 완료');
-  toast('✅ Apps Script URL 저장!', true);
+  updateGasStatus('', '연결 테스트 중...');
+  toast('✅ URL 저장! 연결 테스트 중...', true);
+  fetch(url, { method: 'GET', redirect: 'follow' })
+    .then(r => r.text())
+    .then(text => {
+      try {
+        const d = JSON.parse(text);
+        if (d.ok !== undefined) {
+          document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--green)">✅ 연결 성공! 동기화 버튼을 눌러보세요.</span>';
+          updateGasStatus('conn', '연결 확인됨 — 동기화 가능');
+          toast('✅ Apps Script 연결 성공!', true);
+        } else {
+          throw new Error('응답 형식 오류: ' + text.slice(0,120));
+        }
+      } catch(e) {
+        document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--red)">❌ 응답 파싱 실패: ' + e.message + '</span>';
+        updateGasStatus('err', '연결 실패 — Apps Script 재배포 필요');
+        toast('❌ GAS 응답 오류: ' + e.message, false);
+      }
+    })
+    .catch(err => {
+      document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--red)">❌ 네트워크 오류: ' + err.message + '</span>';
+      updateGasStatus('err', '네트워크 오류');
+      toast('❌ 연결 오류: ' + err.message, false);
+    });
 }
 
 function initAppsScript() {
