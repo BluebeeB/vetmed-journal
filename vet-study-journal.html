@@ -1035,14 +1035,14 @@ html, body {
           <!-- Gemini models -->
           <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-top:8px">Gemini (Google — 무료)</div>
           <label class="model-opt" id="model-opt-gemini-flash">
-            <input type="radio" name="ai-model" value="gemini-2.0-flash" onchange="saveModelChoice(this.value)">
+            <input type="radio" name="ai-model" value="gemini-2.0-flash-lite" onchange="saveModelChoice(this.value)">
             <div>
               <div class="model-name">🆓 Gemini 2.0 Flash <span class="model-badge" style="background:rgba(63,185,80,.2);color:var(--green)">추천 무료</span></div>
               <div class="model-desc">하루 1,500회 무료 · 학습 앱 용도 충분 · Gemini API 키 필요</div>
             </div>
           </label>
           <label class="model-opt" id="model-opt-gemini-pro">
-            <input type="radio" name="ai-model" value="gemini-2.5-pro-preview-03-25" onchange="saveModelChoice(this.value)">
+            <input type="radio" name="ai-model" value="gemini-2.5-flash-preview-04-17" onchange="saveModelChoice(this.value)">
             <div>
               <div class="model-name">🆓 Gemini 2.5 Pro <span class="model-badge" style="background:rgba(210,168,255,.2);color:var(--purple)">무료·고성능</span></div>
               <div class="model-desc">하루 50회 무료 · 심층 분석 가능 · Gemini API 키 필요</div>
@@ -1808,7 +1808,7 @@ async function aiRestructure(id){
 
 // ════════ AI (UPGRADED) ════════
 async function callClaude(sys, usr, maxT=1500){
-  const model = localStorage.getItem('aiModel') || 'gemini-2.0-flash';
+  const model = localStorage.getItem('aiModel') || 'gemini-2.0-flash-lite';
   const isGemini = model.startsWith('gemini');
 
   if(isGemini){
@@ -1866,7 +1866,7 @@ function saveGeminiKey(){
   document.getElementById('gemini-key-status').innerHTML = '<span style="color:var(--green)">✅ Gemini API 키 저장됨 — 무료로 AI 사용 가능!</span>';
   // Auto-select Gemini Flash if no model chosen yet
   if(!localStorage.getItem('aiModel')){
-    localStorage.setItem('aiModel','gemini-2.0-flash');
+    localStorage.setItem('aiModel','gemini-2.0-flash-lite');
     initSettingsPage();
   }
   toast('✅ Gemini API 키 저장! 무료 AI 사용 가능해요.', true);
@@ -1903,8 +1903,8 @@ function updateActiveModelLabel(){
   const labels = {
     'claude-sonnet-4-20250514':'🧠 Claude Sonnet 4',
     'claude-haiku-4-5-20251001':'⚡ Claude Haiku 4.5',
-    'gemini-2.0-flash':'🆓 Gemini 2.0 Flash',
-    'gemini-2.5-pro-preview-03-25':'🆓 Gemini 2.5 Pro'
+    'gemini-2.0-flash-lite':'🆓 Gemini 2.0 Flash',
+    'gemini-2.5-flash-preview-04-17':'🆓 Gemini 2.5 Pro'
   };
   el.textContent = labels[model] || model;
 }
@@ -1960,7 +1960,7 @@ function initSettingsPage(){
     updateGasStatus('conn', '설정됨 — 동기화 준비 완료');
   }
 
-  const model = localStorage.getItem('aiModel') || 'gemini-2.0-flash';
+  const model = localStorage.getItem('aiModel') || 'gemini-2.0-flash-lite';
   document.querySelectorAll('input[name="ai-model"]').forEach(r => { r.checked = r.value === model; });
   updateActiveModelLabel();
   updateUsageDisplay();
