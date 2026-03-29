@@ -2732,7 +2732,7 @@ function showPageFromMore(name){
 // ════════ GOOGLE APPS SCRIPT SYNC ════════
 // 완전 무료, OAuth 없음, URL이 비밀키 역할
 const GAS_SCRIPT = `
-// ── VetMed 일지 Google Apps Script 동기화 코드 v2 ──
+// ── VetMed 일지 Google Apps Script 동기화 코드 v3 ──
 // script.google.com에서 새 프로젝트 만들고 이 코드 전체 붙여넣기
 // 저장(Ctrl+S) → 배포 → 새 배포 → 웹앱 → 액세스: 모든 사용자 → 배포
 
@@ -2749,10 +2749,17 @@ function getOrCreateFile() {
 
 function doGet(e) {
   try {
-    let file = getOrCreateFile();
-    let data = JSON.parse(file.getBlob().getDataAsString());
-    return ContentService.createTextOutput(JSON.stringify({ok:true, data:data}))
-      .setMimeType(ContentService.MimeType.JSON);
+    let action = e.parameter.action || 'load';
+    if (action === 'load') {
+      let file = getOrCreateFile();
+      let data = JSON.parse(file.getBlob().getDataAsString());
+      return ContentService.createTextOutput(JSON.stringify({ok:true, data:data}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'save') {
+      let payload = JSON.parse(decodeURIComponent(e.parameter.data || '{}'));
+      return saveData(payload);
+    }
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({ok:false, error:err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
@@ -2761,52 +2768,38 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    // text/plain;charset=utf-8 로 전송되므로 postData.contents로 파싱
-    let incoming;
-    try {
-      incoming = JSON.parse(e.postData.contents);
-    } catch(parseErr) {
-      // fallback: parameter로 전송된 경우
-      incoming = JSON.parse(Object.keys(e.parameter)[0] || '{}');
-    }
-
-    let file = getOrCreateFile();
-    let existing;
-    try {
-      existing = JSON.parse(file.getBlob().getDataAsString());
-    } catch(fe) {
-      existing = {entries:[], cases:[]};
-    }
-
-    // entries 병합 (id 기준 중복 제거, 최신 날짜 우선)
-    let existingEntries = existing.entries || [];
-    let incomingEntries = incoming.entries || [];
-    let entryMap = {};
-    existingEntries.forEach(e => entryMap[e.id] = e);
-    incomingEntries.forEach(e => {
-      if (!entryMap[e.id] || new Date(e.edited||e.date) > new Date(entryMap[e.id].edited||entryMap[e.id].date)) {
-        entryMap[e.id] = e; // 더 최신 버전으로 덮어쓰기
-      }
-    });
-    let allEntries = Object.values(entryMap).sort((a,b) => new Date(b.date) - new Date(a.date));
-
-    // cases 병합
-    let existingCases = existing.cases || [];
-    let incomingCases = incoming.cases || [];
-    let caseMap = {};
-    existingCases.forEach(c => caseMap[c.id] = c);
-    incomingCases.forEach(c => { if (!caseMap[c.id]) caseMap[c.id] = c; });
-    let allCases = Object.values(caseMap).sort((a,b) => new Date(b.date) - new Date(a.date));
-
-    let merged = {entries: allEntries, cases: allCases, lastSync: new Date().toISOString()};
-    file.setContent(JSON.stringify(merged));
-
-    return ContentService.createTextOutput(JSON.stringify({ok:true, data:merged}))
-      .setMimeType(ContentService.MimeType.JSON);
+    let incoming = JSON.parse(e.postData.contents);
+    return saveData(incoming);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({ok:false, error:err.toString()}))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function saveData(incoming) {
+  let file = getOrCreateFile();
+  let existing;
+  try { existing = JSON.parse(file.getBlob().getDataAsString()); }
+  catch(fe) { existing = {entries:[], cases:[]}; }
+
+  let entryMap = {};
+  (existing.entries||[]).forEach(e => entryMap[e.id] = e);
+  (incoming.entries||[]).forEach(e => {
+    if (!entryMap[e.id] || new Date(e.edited||e.date) > new Date(entryMap[e.id].edited||entryMap[e.id].date))
+      entryMap[e.id] = e;
+  });
+  let allEntries = Object.values(entryMap).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  let caseMap = {};
+  (existing.cases||[]).forEach(c => caseMap[c.id] = c);
+  (incoming.cases||[]).forEach(c => { if (!caseMap[c.id]) caseMap[c.id] = c; });
+  let allCases = Object.values(caseMap).sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+
+  let merged = {entries: allEntries, cases: allCases, lastSync: new Date().toISOString()};
+  file.setContent(JSON.stringify(merged));
+
+  return ContentService.createTextOutput(JSON.stringify({ok:true, data:merged}))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 `.trim();
 
@@ -2833,33 +2826,10 @@ function saveGasUrl() {
   if (!url) { toast('⚠️ URL을 입력해주세요', false); return; }
   if (!url.includes('script.google.com')) { toast('⚠️ Apps Script URL 형식이 아닌 것 같아요', false); }
   localStorage.setItem('gasUrl', url);
-  document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--orange)">⏳ 연결 테스트 중...</span>';
+  document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--green)">✅ URL 저장됨. 동기화 버튼을 눌러 테스트해보세요.</span>';
   document.getElementById('gas-sync-btn').style.display = '';
-  updateGasStatus('', '연결 테스트 중...');
-  toast('✅ URL 저장! 연결 테스트 중...', true);
-  fetch(url, { method: 'GET', redirect: 'follow' })
-    .then(r => r.text())
-    .then(text => {
-      try {
-        const d = JSON.parse(text);
-        if (d.ok !== undefined) {
-          document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--green)">✅ 연결 성공! 동기화 버튼을 눌러보세요.</span>';
-          updateGasStatus('conn', '연결 확인됨 — 동기화 가능');
-          toast('✅ Apps Script 연결 성공!', true);
-        } else {
-          throw new Error('응답 형식 오류: ' + text.slice(0,120));
-        }
-      } catch(e) {
-        document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--red)">❌ 응답 파싱 실패: ' + e.message + '</span>';
-        updateGasStatus('err', '연결 실패 — Apps Script 재배포 필요');
-        toast('❌ GAS 응답 오류: ' + e.message, false);
-      }
-    })
-    .catch(err => {
-      document.getElementById('gas-url-status').innerHTML = '<span style="color:var(--red)">❌ 네트워크 오류: ' + err.message + '</span>';
-      updateGasStatus('err', '네트워크 오류');
-      toast('❌ 연결 오류: ' + err.message, false);
-    });
+  updateGasStatus('ok', '설정됨 — 동기화 준비 완료');
+  toast('✅ Apps Script URL 저장!', true);
 }
 
 function initAppsScript() {
@@ -2926,11 +2896,10 @@ async function gasSync() {
 
   try {
     const payload = { entries, cases };
-    // text/plain;charset=utf-8 → simple request → preflight 없음 → CORS 우회
-    const res = await fetch(url, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    // GET + query parameter 방식 → CORS preflight 없음, 리다이렉트 후에도 동작
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    const res = await fetch(`${url}?action=save&data=${encoded}`, {
+      method: 'GET',
       redirect: 'follow'
     });
 
