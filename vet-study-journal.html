@@ -2896,14 +2896,21 @@ async function gasSync() {
 
   try {
     const payload = { entries, cases };
-    // GET + query parameter 방식 → CORS preflight 없음, 리다이렉트 후에도 동작
-    const encoded = encodeURIComponent(JSON.stringify(payload));
-    const res = await fetch(`${url}?action=save&data=${encoded}`, {
-      method: 'GET',
+    const prevCount = entries.length;
+
+    // no-cors POST로 데이터 전송 (CORS 우회)
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors',
       redirect: 'follow'
     });
 
-    const text = await res.text();
+    // 1.5초 대기 후 GET으로 저장 결과 확인
+    await new Promise(r => setTimeout(r, 1500));
+    const res2 = await fetch(url, { method: 'GET', redirect: 'follow' });
+    const text = await res2.text();
     let result;
     try { result = JSON.parse(text); }
     catch(e) { throw new Error('응답 파싱 실패. Apps Script 재배포 후 다시 시도해보세요.'); }
@@ -2911,7 +2918,6 @@ async function gasSync() {
     if (!result || !result.ok) throw new Error(result?.error || '서버 오류');
 
     const merged = result.data;
-    const prevCount = entries.length;
 
     if (merged.entries) { entries = merged.entries; save(); }
     if (merged.cases) {
